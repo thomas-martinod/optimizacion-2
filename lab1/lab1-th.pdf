@@ -1,0 +1,114 @@
+GE <- data1$ge
+IBM <- data1$ibm
+Mobil <- data1$mobil
+
+mean1 <- mean(IBM)
+mean2 <- mean(GE)
+mean3 <- mean(Mobil)
+
+var1 <- var(IBM)
+var2 <- var(GE)
+var3 <- var(Mobil)
+
+sd1 <- sqrt(var1)
+sd2 <- sqrt(var2)
+sd3 <- sqrt(var3)
+
+cor12 <- cor(IBM,GE)
+cor13 <- cor(IBM,Mobil)
+cor23 <- cor(GE,Mobil)
+
+E_Rp <- function(ws){
+  return (ws[1]*mean1 + ws[2]*mean2 + ws[3]*mean3)}
+
+Var_Rp <- function(ws) {
+  val <- ws[1]^2 * var1 + ws[2]^2 * var2 + ws[3]^2 * var3 + 2*ws[1]*ws[2]*cor12*sd1*sd2 + 
+    2*ws[2]*ws[3]*cor23*sd2*sd3 + 2*ws[1]*ws[3]*cor13*sd1*sd3
+  return(val)}
+
+
+
+# Define the number of steps for each value
+steps <- 100
+
+# Initialize an empty matrix
+matrix <- matrix(0, nrow = (steps + 1) * (steps + 2) / 2, ncol = 3)
+
+# Generate the matrix of combinations
+index <- 1
+for (i in 0:steps) {
+  for (j in 0:(steps - i)) {
+    k <- steps - i - j
+    matrix[index, ] <- c(i/steps, j/steps, k/steps)
+    index <- index + 1
+  }
+}
+
+E_Rp_values <- matrix(0, nrow = (steps + 1) * (steps + 2) / 2, ncol = 1)
+
+for (i in 1:nrow(matrix)) {
+  # Access each row of the matrix
+  E_Rp_values[i] <- E_Rp(matrix[i,])
+}
+E_Rp_values
+
+# Same for variance
+Var_Rp_values <- matrix(0, nrow = (steps + 1) * (steps + 2) / 2, ncol = 1)
+
+for (i in 1:nrow(matrix)) {
+  # Access each row of the matrix
+  Var_Rp_values[i] <- Var_Rp(matrix[i,])
+}
+Var_Rp_values
+
+
+plot(sqrt(Var_Rp_values), E_Rp_values, type="p", pch=20, cex=0.3, xlab = "Riesgo", ylab = "Rentabilidad", main = "Frontera Eficiente", lwd = 2)
+
+
+constraints <- list(
+  fun = function(ws) ws[1] + ws[2] + ws[3] - 1,  # Constraint: ws[1] + ws[2] + ws[3] = 1
+  eq = TRUE  # Equality constraint
+)
+
+# Perform optimization
+result <- optim(
+  fn = Var_Rp,  # Function to optimize
+  par = c(0.33, 0.33, 0.33),  # Initial values for ws[1], ws[2], ws[3]
+  method = "L-BFGS-B",  # Optimization method
+  lower = c(0, 0, 0),  # Lower bounds for ws[1], ws[2], ws[3]
+  upper = c(1, 1, 1),  # Upper bounds for ws[1], ws[2], ws[3]
+  constraints = constraints  # Constraints
+)
+
+result
+
+
+
+w_min <- result$minimum
+r_min = sqrt(var_r(w_min))
+e_min = e_r(w_min) 
+text1 = paste("(", round(r_min,6), ",", round(e_min,6), ")", sep="")
+
+points(r_min, e_min, col = "red", pch = 16, cex=1.5, text(0.0133, 9.6e-04, text1))
+abline(h=e_r(w_min), col="red")
+
+mu_f = 0.51/100
+v1 = mean1 - mu_f
+v2 = mean2 - mu_f
+wt = ((v1 * sd2^2) - (v2 * cor12 * sd1 * sd2))/((v1 * sd2^2) + (v2 *sd1^2) - ((v1+v2)*cor12*sd1*sd2))
+
+E_t = mean1*wt + (1-wt)*mean2
+sigma_t = sqrt((wt^2 * sd1^2) + ((1-wt)^2 * sd2^2) + 2*wt*(1-wt)*cor12*sd1*sd2)
+text2 = paste("(", round(sigma_t,6), ",", round(E_t,6), ")", sep="")
+
+points(sigma_t, E_t, col = "blue",pch = 16, cex=1.5, text(0.0133, 9.35e-04, text2))
+legend(0.0152,8.7e-04, legend = c("Cartera Min. Varianza", "Frontera Eficiente", "Cartera Tangencia"), col = c("red", "red", "blue"),  pch = c(16, NA, 16), lty = c(NA, 1, NA), cex = 1)
+
+# Plot incluyendo el activo libre de riesgo
+plot(sqrt(var_r(w_values)), e_r_values, type = "l", xlab = "Riesgo", ylab = "Rentabilidad", main = "Riesgo vs. Rentabilidad", lwd = 2, xlim=c(0,0.018), ylim=c(7e-04, 0.0055))
+text3 = paste("(", 0, ",", mu_f, ")", sep="")
+points(sigma_t, E_t, col = "red", pch = 16, cex=1.5)
+points(0,mu_f, col = "dark green",pch = 16, cex=1.5, text(0.002, 0.0051, text3))
+segments(sigma_t, E_t, 0, mu_f, col = "blue")
+legend(0.01,0.005, legend = c("Activo Libre de Riesgo", "Ratio de Sharpe", "Cartera de Tangencia"), col = c("dark green", "blue", "red"),  pch = c(16, NA, 16), lty = c(NA, 1, NA), cex = 1)
+
